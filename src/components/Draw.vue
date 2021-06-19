@@ -1,10 +1,46 @@
 <template>
   <div id="Wrapdraw">
     <div><h1>Визуализация модели</h1></div>
+    <div v-bind:class="{'noWiew' : !indata}">
+      <h3>Максимальная длина пролета для данных условий:</h3>
+      <h3 v-if="ismaxL">{{maxL.toFixed(0)}} м</h3>
+      <div v-else-if="!ismaxL" class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    </div>
     <div id="candiv">
-      <h3 v-if="loading">Загрузка...</h3>
-      <h3 v-else-if="indata === null">Введите данные для построения модели</h3>
-      <h3 v-else-if="indata === false" >Такого пролета не существует</h3>
+      <div v-if="loading">
+        <div class="spinner-border" style="width: 3rem; height: 3rem;" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+      <div v-else-if="indata === null">
+        <h3>Введите данные для построения модели</h3>
+        <p>
+          Для расчета параметров провисающего провода используется уравнение идеальной гибкой нерастяжимой нити.
+        </p>
+        <p>Для построения модели начните вводить входные данные и модель начнет рассчитываться автоматически. </p>
+        <p>На входные данные наложено ряд ограничений:</p>
+        <p class="text-left">|xA-xB|>0</p>
+        <p class="text-left">Максимальная температура должна быть больше минимальной</p>
+        <p class="text-left">Следует также учитывать что при визуализации модели земля имеет координаты Y=0, поэтому стоит разумно выбирать эту координату</p>
+      </div>
+      <div v-else-if="indata === false" >
+        <h3>Такого пролета не существует</h3>
+        <p class="mx-4">Это означает что при данных входных условиях невозможно подвесить провод так
+           чтобы при всех возможных климатических условиях стрела провеса и механические напряжения в проводе соответствовали допустимым.
+        </p>
+        <p>При неизменных климатических условиях, следует либо повысить допускаемую стрелу провеса, либо понизить длину пролета</p>
+        <p>Максимальная длина пролета для текущих условий:</p>
+        <p v-if="ismaxL">{{maxL.toFixed(0)}} м</p>
+        <div v-else-if="!ismaxL" class="d-flex justify-content-center">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </div>
     </div>
     <!-- <div id="footer"></div> -->
   </div>
@@ -15,9 +51,18 @@ import {getPoints, transformCoordinate} from '../helpers.js'
 
 export default {
   name: 'Draw',
-  props: ['indata', 'loading'],
+  props: ['indata', 'loading', 'maxL'],
   data: function() {
     return {
+    }
+  },
+  computed: {
+    ismaxL() {
+      if(isNaN(this.maxL)) {
+        return false
+      } else {
+        return true
+      }
     }
   },
   watch: {
@@ -210,4 +255,18 @@ export default {
   #footer {
     height: 100px;
   }
+
+  p {
+    margin-bottom: 0;
+    text-align: center;
+    font-size: 1.2rem;
+  }
+
+  .noWiew {
+    opacity: 0;
+  }
+
+  /* .text-left {
+    text-align: left;
+  } */
 </style>

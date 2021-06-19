@@ -1,23 +1,3 @@
-onmessage = function(e) {
-  if(e.data.message == "newWire") {
-    let result;
-    let wire = new Wire(e.data.data)
-    let state = wire.getTrueState()
-    if(state.state){
-      result = wire.getAnyConditions(0,0,0,state.Th0,state.L0)
-    } else {
-      result = false
-    }
-    postMessage(result)
-  }
-  if(e.data.message == "getState") {
-    let climat = e.data.climat
-    let state = e.data.TrueState
-    let wire = new Wire(e.data.indata, state)
-    postMessage(wire.getAnyConditions(climat.wind, climat.b, climat.temp, state.Th0, state.L0))
-  }
-}
-
 const FLIMIT = Symbol()
 const TLIMIT = Symbol()
 const LLIMIT = Symbol()
@@ -61,11 +41,14 @@ class Wire {
 
   constructor(initData, lastState = null) {
     this.init = this.toStandart(initData);
-    this.l = Math.abs(initData.coordinate.xB - initData.coordinate.xA)
-    this.g = []
     this.getCriticalCondition()
     this.lastState = lastState;
+    this.l = Math.abs(this.init.coordinate.xB - this.init.coordinate.xA)
   }
+
+  // get l() {
+  //   return Math.abs(this.init.coordinate.xB - this.init.coordinate.xA)
+  // }
 
   getCriticalCondition() {
     let g0 = this.init.wire.weight * this.cst.g
@@ -105,11 +88,11 @@ class Wire {
     let followAdd;
     while(true) {
       let f = a*Math.cosh(this.l/(2*a)) - a
-      if(f>this.init.fmax + 0.1) {
+      if(f>(this.init.fmax/2)) {
         if(followAdd === false) da = da/2
         a += da
         followAdd = true;
-      } else if(f<this.init.fmax - 0.1) {
+      } else if(f<(this.init.fmax*0.9/2)) {
         if(followAdd === true) da = da/2
         a -= da
         followAdd = false;
@@ -123,7 +106,7 @@ class Wire {
   getBias(a) {
     let followAdd;
     let dx = this.init.coordinate.xB > this.init.coordinate.xA ? this.l/100 : -this.l/100
-    let xb = this.init.coordinate.xB > this.init.coordinate.xA ? this.init.coordinate.xA + dx : this.init.coordinate.xA + dx
+    let xb = this.init.coordinate.xA + dx
     let yb = this.init.coordinate.yB > this.init.coordinate.yA ? this.init.coordinate.yA - a - this.init.fmax/10 : this.init.coordinate.yB - a - this.init.fmax/10
     while(true) {
       let fx = line(a, xb, yb);
@@ -178,7 +161,7 @@ class Wire {
     this.lastState = {}
     let state = new Set()
     let L0 = this.getLengthLessTension(Th0, this.g0)
-    this.criticalCondition.forEach((e, idx) => {
+    this.criticalCondition.forEach(e => {
       let thistate = this.checkConditions(e.g, e.t, Th0, L0)
       if(!thistate.f) state.add(FLIMIT)
       if(!thistate.maxTension) state.add(TLIMIT)
@@ -191,7 +174,9 @@ class Wire {
     if(state.has(TLIMIT)) return TLIMIT;
   }
 
-  getAnyConditions(w, b, t, Th0, L0) {
+  getAnyConditions(w, b, t) {
+    let Th0 = this.lastState.Th0
+    let L0 = this.lastState.L0
     let g = this.getAnyG(w,b)
     let Th = this.getTfort(Th0, g, L0, t)
     let a = Th / g
@@ -199,7 +184,12 @@ class Wire {
     let fx = line(a, bias.xb,bias.yb)
     let Ymin = this.init.coordinate.yA > this.init.coordinate.yB ? this.init.coordinate.yB : this.init.coordinate.yA
     let Xmax = this.init.coordinate.yA > this.init.coordinate.yB ? this.init.coordinate.xA : this.init.coordinate.xB
-    let f = Ymin - a - bias.yb
+    let ABline = (x) => {
+      return (x-this.init.coordinate.xA)*(this.init.coordinate.yB-this.init.coordinate.yA)/(this.init.coordinate.xB-this.init.coordinate.xA) + this.init.coordinate.yA
+    }
+    let midpoint = (this.init.coordinate.xA + this.init.coordinate.xB) /2
+    let f = ABline(midpoint) - fx(midpoint)
+    // let f = Ymin - a - bias.yb
     let maxTension = Th / (this.init.wire.A * Math.cos(Math.atan(difference(fx, Xmax))))
     return {
       f,
@@ -239,7 +229,12 @@ class Wire {
     let fx = line(a, bias.xb,bias.yb)
     let Ymin = this.init.coordinate.yA > this.init.coordinate.yB ? this.init.coordinate.yB : this.init.coordinate.yA
     let Xmax = this.init.coordinate.yA > this.init.coordinate.yB ? this.init.coordinate.xA : this.init.coordinate.xB
-    let f = Ymin - a - bias.yb
+    let ABline = (x) => {
+      return (x-this.init.coordinate.xA)*(this.init.coordinate.yB-this.init.coordinate.yA)/(this.init.coordinate.xB-this.init.coordinate.xA) + this.init.coordinate.yA
+    }
+    let midpoint = (this.init.coordinate.xA + this.init.coordinate.xB) /2
+    let f = ABline(midpoint) - fx(midpoint)
+    // let f = Ymin - a - bias.yb
     let maxTension = Th / (this.init.wire.A * Math.cos(Math.atan(difference(fx, Xmax))))
     return {
       f: f < this.init.fmax ? true : false,
@@ -295,36 +290,5 @@ class Wire {
       return (this.init.wire.E * Lki(x))/(tensioni(x)+this.init.wire.E)
     }
     return integrate(Li, min, max, 10000)
-  }
-}
-
-class tovarfunc {
-  
-  constructor() {
-    this.points = []
-  }
-
-  setPoint(point) {
-    this.points.push(point)
-  }
-
-  getPoint(params) {
-    let error = []
-    for(let i = 0; i<this.points.length; i++) {
-      let dp = []
-      for(let n in params) {
-        dp.push(this.points[i][n]-params[n])
-      }
-      error.push(Math.sqrt(Math.pow(dp[0], 2) + Math.pow(dp[1], 2)))
-    }
-    let minidx = 0
-    let min = error[0]
-    for(let i = 0; i<error.length; i++) {
-      if(error[i]<min) {
-        minidx = i;
-        min = error[i];
-      }
-    }
-    return this.points[minidx]
   }
 }

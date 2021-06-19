@@ -1,6 +1,6 @@
 <template>
   <div id="draw">
-    <Draw :indata="drawData" :loading="loading"></Draw>
+    <Draw :indata="drawData" :loading="loading" :maxL="maxLength"></Draw>
   </div>
   <div id="main-divider"></div>
   <div id="indata">
@@ -21,38 +21,58 @@ export default {
   data: function () {
     return {
       drawData: null,
-      loading: false
+      loading: false,
+      maxLength: NaN
     }
   },
   methods: {
     onUpdateInit(data) {
       this.indata = data
-      if(this.worker) this.worker.terminate()
-      this.createdWorker()
-      this.worker.postMessage({
-        data,
-        message: 'newWire'
-      })
+      this.createdWorkerUI()
+      this.workerUI.postMessage(data)
       this.loading = true
     },
     onUpdateState(data) {
-      if(this.worker) this.worker.terminate()
-      this.createdWorker()
-      this.worker.postMessage({
+      this.createdWorkerUS()
+      this.workerUS.postMessage({
         climat: data,
         TrueState: this.TrueState,
-        indata: this.indata,
-        message: 'getState'
+        indata: this.indata
       })
     },
-    createdWorker() {
-      this.worker = new Worker('worker.js');
-      this.worker.onmessage = (e) => {
+    getMaxLength() {
+      this.createdWorkerML()
+      this.workerML.postMessage({
+        indata: this.indata
+      })
+    },
+    createdWorkerUI() {
+      if(this.workerUI) this.workerUI.terminate()
+      this.workerUI = new Worker('workerUI.js');
+      this.workerUI.onmessage = (e) => {
+        this.TrueState = e.data.TrueState
+        this.drawData = e.data
+        this.loading = false
+        this.getMaxLength()
+      }
+    },
+    createdWorkerUS() {
+      if(this.workerUS) this.workerUS.terminate()
+      this.workerUS = new Worker('workerUS.js');
+      this.workerUS.onmessage = (e) => {
         this.TrueState = e.data.TrueState
         this.drawData = e.data
         this.loading = false
       }
     },
+    createdWorkerML() {
+      this.maxLength = NaN;
+      if(this.workerML) this.workerML.terminate()
+      this.workerML = new Worker('workerML.js');
+      this.workerML.onmessage = (e) => {
+        this.maxLength = e.data
+      }
+    }
   },
 }
 </script>
